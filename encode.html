@@ -98,18 +98,18 @@ document.getElementById('encryptAll').addEventListener('click', async () => {
     }
   }
 
-  // JSON文字列化＆埋め込み用にエスケープも考慮（ここはJSON.stringifyで問題なし）
+
   const jsonStr = JSON.stringify(a, null, 2);
 
-  // ↓ あなたが編集するHTMLテンプレートの間に埋め込みます
-  const htmlTemplate =
-`\<!DOCTYPE html\>\<html lang="en"\>\<head\>\<meta charset="UTF-8"\>\<title\>A NAZOTOKI\</title\>\</head\>\<body\>\<script\>(function(){const a = ${jsonStr};async function b(p){const e=new TextEncoder();const h=await crypto.subtle.digest("SHA-256",e.encode(p));const r=Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,"0")).join("");const d=a[r];if(!d){if(p=="index.html"){c();return}else{b("index.html");return}}function s(b64){return new Uint8Array(atob(b64).split("").map(c=>c.charCodeAt(0)))}const l=s(d.salt),i=s(d.iv),ciph=s(d.ciphertext);const k=await crypto.subtle.importKey("raw",e.encode(p),{name:"PBKDF2"},!1,["deriveKey"]);const k2=await crypto.subtle.deriveKey({name:"PBKDF2",salt:l,iterations:1e5,hash:"SHA-256"},k,{name:"AES-GCM",length:256},!1,["decrypt"]);try{const dec=await crypto.subtle.decrypt({name:"AES-GCM",iv:i},k2,ciph);document.documentElement.innerHTML=new TextDecoder().decode(dec)}catch(e){c()}};function c(){document.documentElement.innerHTML='<p>Link: <input type="text" id="password"></p><button id="decrypt">GO</button>';document.getElementById("decrypt").addEventListener("click",()=>{const p=document.getElementById("password").value;b(p)})};const u=new URLSearchParams(window.location.search).get("link");if(u){b(u)}else{history.replaceState(null, "", location.pathname);b("index.html")}})();\</script\>\</body\>\</html\>`;
 
-  // ダウンロード用Blob作成
+  const htmlTemplate =
+`\<!DOCTYPE html\>\<html lang="en"\>\<head\>\<meta charset="UTF-8"\>\<title\>A NAZOTOKI\</title\>\</head\>\<body\>\<script\>(function(){const a = ${jsonStr};async function b(p){const e=new TextEncoder();const h=await crypto.subtle.digest("SHA-256",e.encode(p));const r=Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,"0")).join("");const d=a[r];if(!d){;if(p=="index.html"){c();return}else{if (window.history.length > 1) {window.history.back();} else {window.close();};return}}function s(b64){return new Uint8Array(atob(b64).split("").map(c=>c.charCodeAt(0)))}const l=s(d.salt),i=s(d.iv),ciph=s(d.ciphertext);const k=await crypto.subtle.importKey("raw",e.encode(p),{name:"PBKDF2"},!1,["deriveKey"]);const k2=await crypto.subtle.deriveKey({name:"PBKDF2",salt:l,iterations:1e5,hash:"SHA-256"},k,{name:"AES-GCM",length:256},!1,["decrypt"]);try{const dec=await crypto.subtle.decrypt({name:"AES-GCM",iv:i},k2,ciph);document.documentElement.innerHTML=new TextDecoder().decode(dec)}catch(e){c()}};function c(){document.documentElement.innerHTML='<p>Link: <input type="text" id="password"></p><button id="decrypt">GO</button>';document.getElementById("decrypt").addEventListener("click",()=>{const p=document.getElementById("password").value;b(p)})};const u=new URLSearchParams(window.location.search).get("link");if(u){b(u)}else{history.replaceState(null, "", location.pathname);b("index.html")}})();\</script\>\</body\>\</html\>`;
+
+
   const blob = new Blob([htmlTemplate], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
 
-  // 自動ダウンロードリンク作成＆クリックで保存
+
   const aTag = document.createElement('a');
   aTag.href = url;
   aTag.download = 'index.html'; // ファイル名
