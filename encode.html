@@ -12,18 +12,16 @@ table, td, th { border: 1px solid #ccc; border-collapse: collapse; padding: 4px;
 <table id="dataTable">
   <tr>
     <th>Filename</th>
-    <th>HTML</th>
+    <th>HTML File</th>
   </tr>
   <tr>
     <td><input type="text" placeholder="例: file1.html"></td>
-    <td><textarea rows="2" cols="50"></textarea></td>
+    <td><input type="file" accept=".html,.htm"></td>
   </tr>
 </table>
 
 <button id="addRow">Add row</button>
-<button id="encryptAll">ENCRYPT</button>
-
-<pre id="output" style="background:#f0f0f0; padding: 1em;"></pre>
+<button id="encryptAll">ENCRYPT & DOWNLOAD</button>
 
 <script>
 async function encryptData(password, data) {
@@ -57,7 +55,6 @@ async function encryptData(password, data) {
     enc.encode(data)
   );
 
-
   const hashBuffer = await crypto.subtle.digest("SHA-256", enc.encode(password));
   const hashHex = Array.from(new Uint8Array(hashBuffer))
     .map(b => b.toString(16).padStart(2, "0"))
@@ -80,7 +77,7 @@ document.getElementById('addRow').addEventListener('click', () => {
   const cell2 = row.insertCell(1);
 
   cell1.innerHTML = '<input type="text" placeholder="例: file2.html">';
-  cell2.innerHTML = '<textarea rows="2" cols="50"></textarea>';
+  cell2.innerHTML = '<input type="file" accept=".html,.htm">';
 });
 
 document.getElementById('encryptAll').addEventListener('click', async () => {
@@ -90,18 +87,46 @@ document.getElementById('encryptAll').addEventListener('click', async () => {
   const a = {};
 
   for (const row of rows) {
-    const password = row.cells[0].querySelector('input').value.trim();
-    const data = row.cells[1].querySelector('textarea').value.trim();
+    const filename = row.cells[0].querySelector('input').value.trim();
+    const fileInput = row.cells[1].querySelector('input[type="file"]');
+    const file = fileInput.files[0];
 
-    if (password && data) {
-      const { hash, encrypted } = await encryptData(password, data);
+    if (filename && file) {
+      const fileContent = await readFileAsText(file);
+      const { hash, encrypted } = await encryptData(filename, fileContent);
       a[hash] = encrypted;
     }
   }
 
-  document.getElementById('output').textContent = JSON.stringify(a, null, 2);
+  // JSON文字列化＆埋め込み用にエスケープも考慮（ここはJSON.stringifyで問題なし）
+  const jsonStr = JSON.stringify(a, null, 2);
+
+  // ↓ あなたが編集するHTMLテンプレートの間に埋め込みます
+  const htmlTemplate =
+`\<!DOCTYPE html\>\<html lang="en"\>\<head\>\<meta charset="UTF-8"\>\<title\>A NAZOTOKI\</title\>\</head\>\<body\>\<script\>(function(){const a = ${jsonStr};async function b(p){const e=new TextEncoder();const h=await crypto.subtle.digest("SHA-256",e.encode(p));const r=Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,"0")).join("");const d=a[r];if(!d){if(p=="index.html"){c();return}else{b("index.html");return}}function s(b64){return new Uint8Array(atob(b64).split("").map(c=>c.charCodeAt(0)))}const l=s(d.salt),i=s(d.iv),ciph=s(d.ciphertext);const k=await crypto.subtle.importKey("raw",e.encode(p),{name:"PBKDF2"},!1,["deriveKey"]);const k2=await crypto.subtle.deriveKey({name:"PBKDF2",salt:l,iterations:1e5,hash:"SHA-256"},k,{name:"AES-GCM",length:256},!1,["decrypt"]);try{const dec=await crypto.subtle.decrypt({name:"AES-GCM",iv:i},k2,ciph);document.documentElement.innerHTML=new TextDecoder().decode(dec)}catch(e){c()}};function c(){document.documentElement.innerHTML='<p>Link: <input type="text" id="password"></p><button id="decrypt">GO</button>';document.getElementById("decrypt").addEventListener("click",()=>{const p=document.getElementById("password").value;b(p)})};const u=new URLSearchParams(window.location.search).get("link");if(u){b(u)}else{history.replaceState(null, "", location.pathname);b("index.html")}})();\</script\>\</body\>\</html\>`;
+
+  // ダウンロード用Blob作成
+  const blob = new Blob([htmlTemplate], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+
+  // 自動ダウンロードリンク作成＆クリックで保存
+  const aTag = document.createElement('a');
+  aTag.href = url;
+  aTag.download = 'index.html'; // ファイル名
+  document.body.appendChild(aTag);
+  aTag.click();
+  document.body.removeChild(aTag);
+  URL.revokeObjectURL(url);
 });
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsText(file);
+  });
+}
 </script>
 </body>
 </html>
-
