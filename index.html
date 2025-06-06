@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>A NAZOTOKI</title>
+</head>
+<body>
+
+<p>Link: <input type="password" id="password"></p>
+<button id="decrypt">GO</button>
+
+<script>
+const a = {
+  "0eb547304658805aad788d320f10bf1f292797b5e6d745a3bf617584da017051": {
+    "salt": "fdUDT1kggTmOaXUu5YFYWg==",
+    "iv": "Kh7t/E2eGW6YKFsF",
+    "ciphertext": "qtPwRxDR3EJZWfwvScjU4wOAHQjO2Gr8BSQi1KgDfZLIbuaI2bbUHktYM4tdg6K9pd9YebAYEOc40zKNUq5DYJaabwtfgKu/hldAUH6JkdQ="
+  },
+  "5a82f3bebfe4a712c33d9e32ef6c3e6d7bacb13e16dd13c130bd0388ce296eae": {
+    "salt": "AuMYRuRvLsLVA4vK5R4vFg==",
+    "iv": "WTp0RFCmUYCcbhfM",
+    "ciphertext": "TRqkvxeyNreSdT9WP8t1ScJzfYZfZLnI1/uaNCbnfsdv4uB5B6km+xu+U05rYbsgJ61vZXNXHfNgYLAX0Ha4A0XNgUISGluo7OYR6GUNOi2lCw=="
+  }
+};
+
+async function decryptAndReplacePage(password) {
+  const enc = new TextEncoder();
+
+  const hashBuffer = await crypto.subtle.digest("SHA-256", enc.encode(password));
+  const hashHex = Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  const encryptedData = a[hashHex];
+  if (!encryptedData) {
+    // ⚠️ データが見つからない場合は「パスワード入力ページ」に戻す
+    showInputPage();
+    return;
+  }
+
+  function base64ToBytes(b64) {
+    return new Uint8Array(atob(b64).split("").map(c => c.charCodeAt(0)));
+  }
+
+  const salt = base64ToBytes(encryptedData.salt);
+  const iv = base64ToBytes(encryptedData.iv);
+  const ciphertext = base64ToBytes(encryptedData.ciphertext);
+
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"]
+  );
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: 100000,
+      hash: "SHA-256"
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"]
+  );
+
+  try {
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: iv },
+      key,
+      ciphertext
+    );
+    const decodedHTML = new TextDecoder().decode(decrypted);
+
+    document.documentElement.innerHTML = decodedHTML;
+
+  } catch (e) {
+
+    showInputPage();
+  }
+}
+
+function showInputPage() {
+  document.documentElement.innerHTML = `
+    <p>Link: <input type="password" id="password"></p>
+    <button id="decrypt">GO</button>
+  `;
+  document.getElementById('decrypt').addEventListener('click', () => {
+    const password = document.getElementById('password').value;
+    decryptAndReplacePage(password);
+  });
+}
+
+
+const urlParams = new URLSearchParams(window.location.search);
+const linkPassword = urlParams.get('link');
+
+if (linkPassword) {
+  decryptAndReplacePage(linkPassword);
+} else {
+  showInputPage();
+}
+</script>
+</body>
+</html>
+

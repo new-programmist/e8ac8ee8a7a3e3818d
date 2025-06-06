@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ENCRYPTER</title>
+<style>
+table, td, th { border: 1px solid #ccc; border-collapse: collapse; padding: 4px; }
+</style>
+</head>
+<body>
+
+<table id="dataTable">
+  <tr>
+    <th>Filename</th>
+    <th>HTML</th>
+  </tr>
+  <tr>
+    <td><input type="text" placeholder="例: file1.html"></td>
+    <td><textarea rows="2" cols="50"></textarea></td>
+  </tr>
+</table>
+
+<button id="addRow">Add row</button>
+<button id="encryptAll">ENCRYPT</button>
+
+<pre id="output" style="background:#f0f0f0; padding: 1em;"></pre>
+
+<script>
+async function encryptData(password, data) {
+  const enc = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"]
+  );
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: 100000,
+      hash: "SHA-256"
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"]
+  );
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv },
+    key,
+    enc.encode(data)
+  );
+
+
+  const hashBuffer = await crypto.subtle.digest("SHA-256", enc.encode(password));
+  const hashHex = Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  return {
+    hash: hashHex,
+    encrypted: {
+      salt: btoa(String.fromCharCode(...salt)),
+      iv: btoa(String.fromCharCode(...iv)),
+      ciphertext: btoa(String.fromCharCode(...new Uint8Array(encrypted)))
+    }
+  };
+}
+
+document.getElementById('addRow').addEventListener('click', () => {
+  const table = document.getElementById('dataTable');
+  const row = table.insertRow();
+  const cell1 = row.insertCell(0);
+  const cell2 = row.insertCell(1);
+
+  cell1.innerHTML = '<input type="text" placeholder="例: file2.html">';
+  cell2.innerHTML = '<textarea rows="2" cols="50"></textarea>';
+});
+
+document.getElementById('encryptAll').addEventListener('click', async () => {
+  const table = document.getElementById('dataTable');
+  const rows = Array.from(table.rows).slice(1);
+
+  const a = {};
+
+  for (const row of rows) {
+    const password = row.cells[0].querySelector('input').value.trim();
+    const data = row.cells[1].querySelector('textarea').value.trim();
+
+    if (password && data) {
+      const { hash, encrypted } = await encryptData(password, data);
+      a[hash] = encrypted;
+    }
+  }
+
+  document.getElementById('output').textContent = JSON.stringify(a, null, 2);
+});
+</script>
+</body>
+</html>
+
